@@ -1,20 +1,23 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+  <img alt="Concept Viz screenshot" src="concept-viz-screenshot.png" width="1200" />
 </div>
 
-# Run and deploy your AI Studio app
+# Concept Viz — Gemini 3 concept visualizer
 
-This contains everything you need to run your app locally.
+Concept Viz turns any concept into an interactive visualization. Type a topic and Gemini 3 Pro Preview generates the visualization code and short explainer, rendered in-app with a toggle to inspect the HTML/JS/CSS behind it.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1fzkSyefY7_1d3ymEfkuGds6_g_3xfO2q
+## What it does
 
-## Run Locally
+- Generates highly interactive visuals (D3.js or Canvas) from natural language prompts, styled for a dark UI.
+- Offers quick suggestions to jumpstart prompts and a fast regenerate flow.
+- Dual views: play with the visualization or read the generated code; download a self-contained HTML file for reuse.
+- Inline explanation panel you can show/hide while exploring the visualization.
 
-**Prerequisites:**  Node.js
+## Run locally
 
+**Prerequisites:** Node.js
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Install dependencies: `npm install`
+2. Add your API key: create a `.env` file in the project root with `GEMINI_API_KEY=your_key_here`
+3. Start the dev server: `npm run dev`
+4. Open the provided localhost URL and start visualizing concepts.
