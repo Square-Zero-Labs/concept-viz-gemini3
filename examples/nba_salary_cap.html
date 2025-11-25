@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NBA Salary Cap Visualizer</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+
+        body {
+            margin: 0;
+            background-color: #0f172a;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            max-width: 1200px;
+            position: relative;
+        }
+
+        /* Controls Section (Left) */
+        #controls {
+            width: 25%;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            z-index: 10;
+        }
+
+        h2 {
+            font-weight: 300;
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: #e2e8f0;
+        }
+
+        p.desc {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .player-btn {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid #334155;
+            color: white;
+            padding: 15px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .player-btn:hover {
+            background: rgba(51, 65, 85, 0.8);
+            transform: translateX(5px);
+            border-color: #64748b;
+        }
+
+        .player-btn span.cost {
+            font-weight: 600;
+            opacity: 0.8;
+        }
+
+        /* Specific colors for buttons matching the chart */
+        .btn-rookie { border-left: 4px solid #22d3ee; }
+        .btn-vet { border-left: 4px solid #facc15; }
+        .btn-star { border-left: 4px solid #f472b6; }
+        .btn-supermax { border-left: 4px solid #c084fc; }
+
+        #reset-btn {
+            margin-top: auto;
+            background: transparent;
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+        }
+
+        #reset-btn:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        /* Visualization Section (Center/Right) */
+        #viz-area {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 50px;
+        }
+
+        /* Tooltips & Info */
+        .tooltip {
+            position: absolute;
+            background: #1e293b;
+            border: 1px solid #475569;
+            padding: 8px 12px;
+            border-radius: 6px;
+            pointer-events: none;
+            font-size: 0.8rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        /* Stats Panel */
+        #stats-panel {
+            position: absolute;
+            top: 40px;
+            right: 40px;
+            background: rgba(15, 23, 42, 0.9);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            width: 280px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .stat-val {
+            font-weight: 600;
+            font-feature-settings: 'tnum';
+        }
+
+        .highlight-tax {
+            color: #f472b6;
+            text-shadow: 0 0 10px rgba(244, 114, 182, 0.4);
+        }
+
+        /* SVG Styles */
+        .axis text {
+            fill: #94a3b8;
+            font-size: 12px;
+        }
+        .axis line, .axis path {
+            stroke: #334155;
+        }
+        .grid-line {
+            stroke: #334155;
+            stroke-dasharray: 4;
+            opacity: 0.5;
+        }
+        .limit-line {
+            stroke-width: 2;
+            stroke-dasharray: 6;
+        }
+        .limit-text {
+            font-size: 12px;
+            font-weight: 600;
+            text-anchor: start;
+        }
+        
+        .bar-rect {
+            transition: fill 0.3s;
+            cursor: pointer;
+        }
+        .bar-rect:hover {
+            opacity: 0.8;
+        }
+
+        /* Glow definitions */
+        .neon-text {
+            text-shadow: 0 0 5px currentColor;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <div id="controls">
+            <h2>Roster Builder</h2>
+            <p class="desc">
+                Add contracts to the stack. Watch how exceeding the <strong>Salary Cap</strong> is allowed (Soft Cap), but crossing the <strong>Tax Line</strong> triggers exponential penalties.
+            </p>
+
+            <div class="btn-group">
+                <button class="player-btn btn-rookie" onclick="addPlayer('Rookie', 10)">
+                    <span>Rookie Deal</span>
+                    <span class="cost">$10M</span>
+                </button>
+                <button class="player-btn btn-vet" onclick="addPlayer('Veteran', 20)">
+                    <span>Role Player</span>
+                    <span class="cost">$20M</span>
+                </button>
+                <button class="player-btn btn-star" onclick="addPlayer('All-Star', 45)">
+                    <span>All-Star</span>
+                    <span class="cost">$45M</span>
+                </button>
+                <button class="player-btn btn-supermax" onclick="addPlayer('Supermax', 60)">
+                    <span>Supermax</span>
+                    <span class="cost">$60M</span>
+                </button>
+            </div>
+
+            <button class="player-btn" id="reset-btn" onclick="resetRoster()">Reset Roster</button>
+        </div>
+
+        <div id="viz-area"></div>
+
+        <div id="stats-panel">
+            <div class="stat-row">
+                <span style="color: #94a3b8">Total Salary:</span>
+                <span class="stat-val" id="val-salary">$0M</span>
+            </div>
+            <div class="stat-row">
+                <span style="color: #94a3b8">Status:</span>
+                <span class="stat-val" id="val-status" style="color: #22d3ee">Under Cap</span>
+            </div>
+            <hr style="border-color: #334155; opacity: 0.5; margin: 15px 0;">
+            <div class="stat-row">
+                <span style="color: #f472b6">Luxury Tax Bill:</span>
+                <span class="stat-val highlight-tax" id="val-tax">$0</span>
+            </div>
+            <div class="stat-row">
+                <span style="color: white; font-weight: 600;">Total Cost:</span>
+                <span class="stat-val" id="val-total">$0M</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Constants ---
+        // Simplified 2024-25 NBA numbers (approx)
+        const SALARY_CAP = 140;
+        const TAX_LEVEL = 170;
+        const APRON_1 = 178;
+        const APRON_2 = 190;
+
+        // Canvas dimensions
+        const width = 800;
+        const height = 700;
+        const margin = { top: 50, right: 150, bottom: 50, left: 100 };
+
+        // --- State ---
+        let roster = [];
+        let nextId = 0;
+
+        // --- D3 Setup ---
+        const svg = d3.select("#viz-area")
+            .append("svg")
+            .attr("width", "100%")
+            .attr("height", "100%")
+            .attr("viewBox", `0 0 ${width} ${height}`)
+            .attr("preserveAspectRatio", "xMidYMid meet");
+
+        // Add filter for glow effect
+        const defs = svg.append("defs");
+        const filter = defs.append("filter")
+            .attr("id", "glow");
+        filter.append("feGaussianBlur")
+            .attr("stdDeviation", "2.5")
+            .attr("result", "coloredBlur");
+        const feMerge = filter.append("feMerge");
+        feMerge.append("feMergeNode").attr("in", "coloredBlur");
+        feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
+        // Scales
+        const yScale = d3.scaleLinear()
+            .domain([0, 250]) // Scale up to $250M
+            .range([height - margin.bottom, margin.top]);
+
+        const xScale = d3.scaleBand()
+            .domain(['Payroll', 'Tax Penalty'])
+            .range([margin.left, width - margin.right])
+            .padding(0.4);
+
+        // --- Drawing Static Elements ---
+        
+        // Axis
+        const yAxis = d3.axisLeft(yScale)
+            .tickFormat(d => `$${d}M`)
+            .tickSize(-width + margin.left + margin.right + 50);
+
+        svg.append("g")
+            .attr("class", "axis")
+            .attr("transform", `translate(${margin.left}, 0)`)
+            .call(yAxis)
+            .select(".domain").remove();
+
+        svg.selectAll(".tick line")
+            .attr("stroke", "#334155")
+            .attr("stroke-dasharray", "2,2")
+            .attr("opacity", 0.3);
+
+        // Labels for Bars
+        svg.append("text")
+            .attr("x", xScale('Payroll') + xScale.bandwidth()/2)
+            .attr("y", height - margin.bottom + 30)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#94a3b8")
+            .style("font-size", "14px")
+            .text("Team Payroll");
+
+        svg.append("text")
+            .attr("x", xScale('Tax Penalty') + xScale.bandwidth()/2)
+            .attr("y", height - margin.bottom + 30)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#f472b6")
+            .style("font-size", "14px")
+            .text("Luxury Tax Bill");
+
+
+        // Helper to draw threshold lines
+        function drawThreshold(value, color, label, anchorX) {
+            const y = yScale(value);
+            const g = svg.append("g").attr("class", "threshold-group");
+            
+            g.append("line")
+                .attr("x1", margin.left)
+                .attr("x2", width - margin.right + 20)
+                .attr("y1", y)
+                .attr("y2", y)
+                .attr("class", "limit-line")
+                .attr("stroke", color);
+
+            g.append("text")
+                .attr("x", width - margin.right + 25)
+                .attr("y", y + 4)
+                .attr("class", "limit-text")
+                .attr("fill", color)
+                .text(label);
+        }
+
+        drawThreshold(SALARY_CAP, "#22d3ee", "Salary Cap", width);
+        drawThreshold(TAX_LEVEL, "#facc15", "Tax Threshold", width);
+        drawThreshold(APRON_2, "#f472b6", "2nd Apron", width);
+
+        // Groups for bars
+        const payrollGroup = svg.append("g").attr("class", "payroll-stack");
+        const taxGroup = svg.append("g").attr("class", "tax-bar");
+
+        // --- Logic ---
+
+        function calculateTax(salary) {
+            if (salary <= TAX_LEVEL) return 0;
+            
+            let overage = salary - TAX_LEVEL;
+            let tax = 0;
+
+            // Progressive tax brackets (Simplified approximation of NBA rules)
+            // $1.50 for first 5m, $1.75 for next, etc. 
+            // Using a simplified exponential curve for visualization impact
+            
+            // Bracket 1: 0-5M over ($1.50)
+            const b1 = Math.min(overage, 5);
+            tax += b1 * 1.50;
+            overage -= b1;
+            
+            // Bracket 2: 5-10M over ($1.75)
+            if (overage > 0) {
+                const b2 = Math.min(overage, 5);
+                tax += b2 * 1.75;
+                overage -= b2;
+            }
+
+            // Bracket 3: 10-15M over ($2.50)
+            if (overage > 0) {
+                const b3 = Math.min(overage, 5);
+                tax += b3 * 2.50;
+                overage -= b3;
+            }
+
+            // Bracket 4: 15-20M over ($3.25) -> Into Apron 2
+            if (overage > 0) {
+                const b4 = Math.min(overage, 5);
+                tax += b4 * 3.25;
+                overage -= b4;
+            }
+
+            // Repeater / Deep tax (Super punitive)
+            if (overage > 0) {
+                tax += overage * 4.50;
+            }
+
+            return tax;
+        }
+
+        function updateViz() {
+            const totalSalary = roster.reduce((sum, p) => sum + p.value, 0);
+            const taxBill = calculateTax(totalSalary);
+
+            // --- Update Payroll Stack ---
+            // We need to calculate the y-position for each block in the stack
+            let currentY = 0;
+            const stackData = roster.map(d => {
+                const obj = { ...d, yBot: currentY, yTop: currentY + d.value };
+                currentY += d.value;
+                return obj;
+            });
+
+            const bars = payrollGroup.selectAll(".bar-rect")
+                .data(stackData, d => d.id);
+
+            // Enter
+            bars.enter().append("rect")
+                .attr("class", "bar-rect")
+                .attr("x", xScale('Payroll'))
+                .attr("width", xScale.bandwidth())
+                .attr("y", d => yScale(d.yBot)) // Start from bottom
+                .attr("height", 0)
+                .attr("fill", d => getColor(d.type))
+                .attr("stroke", "#0f172a")
+                .attr("stroke-width", 1)
+                .on("click", (e, d) => removePlayer(d.id))
+                .transition().duration(500)
+                .attr("y", d => yScale(d.yTop))
+                .attr("height", d => yScale(d.yBot) - yScale(d.yTop));
+
+            // Update
+            bars.transition().duration(500)
+                .attr("y", d => yScale(d.yTop))
+                .attr("height", d => yScale(d.yBot) - yScale(d.yTop));
+
+            // Exit
+            bars.exit()
+                .transition().duration(300)
+                .attr("height", 0)
+                .attr("y", d => yScale(d.yBot)) // Shrink to bottom
+                .remove();
+
+
+            // --- Update Tax Bar ---
+            const taxRect = taxGroup.selectAll(".tax-rect")
+                .data([taxBill]);
+
+            taxRect.enter().append("rect")
+                .attr("class", "tax-rect")
+                .attr("x", xScale('Tax Penalty'))
+                .attr("width", xScale.bandwidth())
+                .attr("y", yScale(0))
+                .attr("height", 0)
+                .attr("fill", "#f472b6")
+                .style("filter", "url(#glow)")
+                .transition().duration(500)
+                .attr("y", yScale(taxBill))
+                .attr("height", yScale(0) - yScale(taxBill));
+            
+            taxRect.transition().duration(500)
+                .attr("y", yScale(taxBill))
+                .attr("height", yScale(0) - yScale(taxBill));
+
+
+            // --- Update Stats Text ---
+            d3.select("#val-salary").text(`$${totalSalary}M`);
+            d3.select("#val-tax").text(`$${taxBill.toFixed(1)}M`);
+            d3.select("#val-total").text(`$${(totalSalary + taxBill).toFixed(1)}M`);
+
+            const statusEl = d3.select("#val-status");
+            if (totalSalary < SALARY_CAP) {
+                statusEl.text("Under Cap").style("color", "#22d3ee");
+            } else if (totalSalary < TAX_LEVEL) {
+                statusEl.text("Over Cap (Soft Cap)").style("color", "#facc15");
+            } else if (totalSalary < APRON_2) {
+                statusEl.text("In Luxury Tax").style("color", "#f472b6");
+            } else {
+                statusEl.text("2nd Apron (Restrictive)").style("color", "#c084fc");
+            }
+        }
+
+        function getColor(type) {
+            switch(type) {
+                case 'Rookie': return '#22d3ee';
+                case 'Veteran': return '#facc15';
+                case 'All-Star': return '#f472b6';
+                case 'Supermax': return '#c084fc';
+                default: return '#fff';
+            }
+        }
+
+        // --- Interaction Handlers ---
+        window.addPlayer = function(type, value) {
+            roster.push({ id: nextId++, type, value });
+            updateViz();
+        };
+
+        window.removePlayer = function(id) {
+            roster = roster.filter(p => p.id !== id);
+            updateViz();
+        };
+
+        window.resetRoster = function() {
+            roster = [];
+            updateViz();
+        };
+
+        // Initialize
+        updateViz();
+
+    </script>
+</body>
+</html>

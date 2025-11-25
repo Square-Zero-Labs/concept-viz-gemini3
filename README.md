@@ -21,3 +21,11 @@ Concept Viz turns any concept into an interactive visualization. Type a topic an
 2. Add your API key: create a `.env` file in the project root with `GEMINI_API_KEY=your_key_here`
 3. Start the dev server: `npm run dev`
 4. Open the provided localhost URL and start visualizing concepts.
+
+## Examples
+- Binary search: [`examples/binary_search.html`](examples/binary_search.html)
+- Classifier-free guidance: [`examples/classifier_free_guidance.html`](examples/classifier_free_guidance.html)
+- Matrix multiplication: [`examples/matrix-multiplication.html`](examples/matrix-multiplication.html)
+- NBA salary cap: [`examples/nba_salary_cap.html`](examples/nba_salary_cap.html)
+
+Open any of these HTML files directly in your browser to see sample outputs created by Concept Viz.

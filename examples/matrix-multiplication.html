@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Multiplication Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0f172a;
+            font-family: 'Inter', sans-serif;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            display: flex;
+            gap: 30px;
+            background: rgba(15, 23, 42, 0.8);
+            padding: 15px 30px;
+            border-radius: 12px;
+            backdrop-filter: blur(5px);
+            border: 1px solid #334155;
+            z-index: 10;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #94a3b8;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100px;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #22d3ee;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px #22d3ee;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        button {
+            background: transparent;
+            border: 1px solid #c084fc;
+            color: #c084fc;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: #c084fc;
+            color: #fff;
+            box-shadow: 0 0 15px #c084fc;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #formula-bar {
+            position: absolute;
+            bottom: 40px;
+            min-height: 60px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.2rem;
+            color: #facc15;
+            text-shadow: 0 0 10px rgba(250, 204, 21, 0.3);
+            text-align: center;
+            max-width: 80%;
+            line-height: 1.5;
+            padding: 10px 20px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .matrix-label {
+            font-size: 1.5rem;
+            font-weight: bold;
+            fill: #94a3b8;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .cell rect {
+            fill: rgba(255, 255, 255, 0.03);
+            stroke: #334155;
+            stroke-width: 1;
+            transition: all 0.2s;
+        }
+
+        .cell text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            text-anchor: middle;
+            dominant-baseline: central;
+            fill: white;
+            pointer-events: none;
+        }
+
+        /* Specific Colors for Matrices */
+        .matrix-a rect { stroke: #22d3ee; }
+        .matrix-a.active rect { fill: rgba(34, 211, 238, 0.2); box-shadow: 0 0 10px #22d3ee; }
+        .matrix-a text { fill: #22d3ee; }
+
+        .matrix-b rect { stroke: #f472b6; }
+        .matrix-b.active rect { fill: rgba(244, 114, 182, 0.2); }
+        .matrix-b text { fill: #f472b6; }
+
+        .matrix-c rect { stroke: #c084fc; stroke-width: 2; }
+        .matrix-c text { fill: #c084fc; font-weight: bold; }
+        
+        .bracket {
+            fill: none;
+            stroke: white;
+            stroke-width: 2;
+        }
+
+        /* Connection Lines */
+        .connector {
+            fill: none;
+            stroke: #facc15;
+            stroke-width: 2;
+            stroke-dasharray: 5;
+            opacity: 0.6;
+            filter: drop-shadow(0 0 4px #facc15);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <div class="control-group">
+            <label>Rows A (M)</label>
+            <input type="range" id="rowsA" min="1" max="4" value="3">
+        </div>
+        <div class="control-group">
+            <label>Common (N)</label>
+            <input type="range" id="common" min="1" max="4" value="3">
+        </div>
+        <div class="control-group">
+            <label>Cols B (P)</label>
+            <input type="range" id="colsB" min="1" max="4" value="2">
+        </div>
+        <button onclick="randomizeValues()">Randomize Values</button>
+    </div>
+
+    <div id="canvas-container"></div>
+    
+    <div id="formula-bar">Hover over the Result Matrix (Purple) to see the dot product.</div>
+
+    <script>
+        // Configuration
+        const config = {
+            cellSize: 50,
+            gap: 10,
+            matrixGap: 80,
+            colors: {
+                a: '#22d3ee',
+                b: '#f472b6',
+                c: '#c084fc',
+                highlight: '#facc15'
+            }
+        };
+
+        let state = {
+            m: 3,
+            n: 3,
+            p: 2,
+            matrixA: [],
+            matrixB: [],
+            matrixC: []
+        };
+
+        // SVG Setup
+        const svg = d3.select("#canvas-container")
+            .append("svg")
+            .attr("width", "100%")
+            .attr("height", "100%");
+            
+        const mainGroup = svg.append("g");
+        const connectorsGroup = mainGroup.append("g").attr("class", "connectors");
+        const matricesGroup = mainGroup.append("g").attr("class", "matrices");
+
+        // Initialization
+        function init() {
+            // Event Listeners
+            d3.select("#rowsA").on("input", function() { state.m = +this.value; updateData(); render(); });
+            d3.select("#common").on("input", function() { state.n = +this.value; updateData(); render(); });
+            d3.select("#colsB").on("input", function() { state.p = +this.value; updateData(); render(); });
+
+            // Handle resize
+            window.addEventListener('resize', render);
+
+            randomizeValues();
+        }
+
+        function randomizeValues() {
+            const randomInt = () => Math.floor(Math.random() * 9) + 1;
+            
+            // We create larger arrays than needed to handle resizing without losing data immediately
+            state.matrixA = Array.from({length: 5}, () => Array.from({length: 5}, randomInt));
+            state.matrixB = Array.from({length: 5}, () => Array.from({length: 5}, randomInt));
+            
+            updateData();
+            render();
+        }
+
+        function updateData() {
+            // Calculate C based on current dimensions
+            state.matrixC = [];
+            for (let i = 0; i < state.m; i++) {
+                let row = [];
+                for (let j = 0; j < state.p; j++) {
+                    let sum = 0;
+                    for (let k = 0; k < state.n; k++) {
+                        sum += state.matrixA[i][k] * state.matrixB[k][j];
+                    }
+                    row.push(sum);
+                }
+                state.matrixC.push(row);
+            }
+        }
+
+        function render() {
+            matricesGroup.selectAll("*").remove();
+            connectorsGroup.selectAll("*").remove();
+
+            const width = document.getElementById("canvas-container").clientWidth;
+            const height = document.getElementById("canvas-container").clientHeight;
+
+            // Calculate total width to center content
+            const widthA = state.n * config.cellSize + (state.n - 1) * config.gap;
+            const widthB = state.p * config.cellSize + (state.p - 1) * config.gap;
+            const widthC = state.p * config.cellSize + (state.p - 1) * config.gap;
+            const totalWidth = widthA + widthB + widthC + (config.matrixGap * 2) + 150; // +150 for labels/padding
+
+            const startX = (width - totalWidth) / 2;
+            const startY = height / 2 - (Math.max(state.m, state.n) * (config.cellSize + config.gap)) / 2;
+
+            // Helper to draw bracket
+            const drawBracket = (x, y, w, h, type) => {
+                const pad = 10;
+                const path = d3.path();
+                if (type === 'left') {
+                    path.moveTo(x + pad, y - pad);
+                    path.lineTo(x, y - pad);
+                    path.lineTo(x, y + h + pad);
+                    path.lineTo(x + pad, y + h + pad);
+                } else {
+                    path.moveTo(x + w - pad, y - pad);
+                    path.lineTo(x + w, y - pad);
+                    path.lineTo(x + w, y + h + pad);
+                    path.lineTo(x + w - pad, y + h + pad);
+                }
+                matricesGroup.append("path")
+                    .attr("d", path.toString())
+                    .attr("class", "bracket");
+            };
+
+            // --- Draw Matrix A ---
+            const posA = { x: startX + 20, y: height / 2 - (state.m * (config.cellSize + config.gap)) / 2 };
+            const heightA = state.m * config.cellSize + (state.m - 1) * config.gap;
+            
+            drawBracket(posA.x - 15, posA.y, widthA + 30, heightA, 'left');
+            drawBracket(posA.x - 15, posA.y, widthA + 30, heightA, 'right');
+            
+            matricesGroup.append("text")
+                .attr("x", posA.x + widthA / 2)
+                .attr("y", posA.y - 30)
+                .attr("class", "matrix-label")
+                .attr("text-anchor", "middle")
+                .text("A");
+
+            for (let i = 0; i < state.m; i++) {
+                for (let k = 0; k < state.n; k++) {
+                    const g = matricesGroup.append("g")
+                        .attr("transform", `translate(${posA.x + k * (config.cellSize + config.gap)}, ${posA.y + i * (config.cellSize + config.gap)})`)
+                        .attr("class", `cell matrix-a cell-a-${i}-${k}`)
+                        .attr("data-row", i)
+                        .attr("data-col", k);
+
+                    g.append("rect")
+                        .attr("width", config.cellSize)
+                        .attr("height", config.cellSize)
+                        .attr("rx", 6);
+
+                    g.append("text")
+                        .attr("x", config.cellSize / 2)
+                        .attr("y", config.cellSize / 2)
+                        .text(state.matrixA[i][k]);
+                }
+            }
+
+            // --- Draw Matrix B ---
+            const posB = { x: posA.x + widthA + config.matrixGap, y: height / 2 - (state.n * (config.cellSize + config.gap)) / 2 };
+            const heightB = state.n * config.cellSize + (state.n - 1) * config.gap;
+
+            drawBracket(posB.x - 15, posB.y, widthB + 30, heightB, 'left');
+            drawBracket(posB.x - 15, posB.y, widthB + 30, heightB, 'right');
+
+            matricesGroup.append("text")
+                .attr("x", posB.x + widthB / 2)
+                .attr("y", posB.y - 30)
+                .attr("class", "matrix-label")
+                .attr("text-anchor", "middle")
+                .text("B");
+
+            for (let k = 0; k < state.n; k++) {
+                for (let j = 0; j < state.p; j++) {
+                    const g = matricesGroup.append("g")
+                        .attr("transform", `translate(${posB.x + j * (config.cellSize + config.gap)}, ${posB.y + k * (config.cellSize + config.gap)})`)
+                        .attr("class", `cell matrix-b cell-b-${k}-${j}`)
+                        .attr("data-row", k)
+                        .attr("data-col", j);
+
+                    g.append("rect")
+                        .attr("width", config.cellSize)
+                        .attr("height", config.cellSize)
+                        .attr("rx", 6);
+
+                    g.append("text")
+                        .attr("x", config.cellSize / 2)
+                        .attr("y", config.cellSize / 2)
+                        .text(state.matrixB[k][j]);
+                }
+            }
+
+            // --- Equality Sign ---
+            matricesGroup.append("text")
+                .attr("x", posB.x + widthB + config.matrixGap / 2)
+                .attr("y", height / 2)
+                .attr("class", "matrix-label")
+                .attr("dominant-baseline", "middle")
+                .attr("text-anchor", "middle")
+                .text("=");
+
+            // --- Draw Matrix C (Result) ---
+            const posC = { x: posB.x + widthB + config.matrixGap, y: height / 2 - (state.m * (config.cellSize + config.gap)) / 2 };
+            const heightC = state.m * config.cellSize + (state.m - 1) * config.gap;
+
+            drawBracket(posC.x - 15, posC.y, widthC + 30, heightC, 'left');
+            drawBracket(posC.x - 15, posC.y, widthC + 30, heightC, 'right');
+
+            matricesGroup.append("text")
+                .attr("x", posC.x + widthC / 2)
+                .attr("y", posC.y - 30)
+                .attr("class", "matrix-label")
+                .attr("text-anchor", "middle")
+                .text("C");
+
+            for (let i = 0; i < state.m; i++) {
+                for (let j = 0; j < state.p; j++) {
+                    const g = matricesGroup.append("g")
+                        .attr("transform", `translate(${posC.x + j * (config.cellSize + config.gap)}, ${posC.y + i * (config.cellSize + config.gap)})`)
+                        .attr("class", "cell matrix-c")
+                        .style("cursor", "pointer")
+                        .on("mouseenter", () => highlightCalculation(i, j))
+                        .on("mouseleave", clearHighlight);
+
+                    g.append("rect")
+                        .attr("width", config.cellSize)
+                        .attr("height", config.cellSize)
+                        .attr("rx", 6);
+
+                    g.append("text")
+                        .attr("x", config.cellSize / 2)
+                        .attr("y", config.cellSize / 2)
+                        .text(state.matrixC[i][j]);
+                }
+            }
+
+            // Animation Logic
+            function highlightCalculation(rowIdx, colIdx) {
+                // Clear previous
+                d3.selectAll(".active").classed("active", false);
+                connectorsGroup.selectAll("*").remove();
+
+                // Highlight Row in A
+                for (let k = 0; k < state.n; k++) {
+                    d3.select(`.cell-a-${rowIdx}-${k}`).classed("active", true);
+                }
+
+                // Highlight Col in B
+                for (let k = 0; k < state.n; k++) {
+                    d3.select(`.cell-b-${k}-${colIdx}`).classed("active", true);
+                }
+
+                // Build Formula String
+                let formulaHTML = `<span style='color:#c084fc'>C<sub>${rowIdx+1},${colIdx+1}</sub></span> = `;
+                
+                // Draw Connectors and build text
+                const targetCell = d3.select(event.currentTarget);
+                const tx = parseFloat(targetCell.attr("transform").split('(')[1].split(',')[0]) + config.cellSize/2;
+                const ty = parseFloat(targetCell.attr("transform").split(',')[1].split(')')[0]) + config.cellSize/2;
+
+                for (let k = 0; k < state.n; k++) {
+                    const valA = state.matrixA[rowIdx][k];
+                    const valB = state.matrixB[k][colIdx];
+                    
+                    formulaHTML += `(<span style='color:#22d3ee'>${valA}</span> × <span style='color:#f472b6'>${valB}</span>)`;
+                    if (k < state.n - 1) formulaHTML += " + ";
+
+                    // Lines from A
+                    const cellA = d3.select(`.cell-a-${rowIdx}-${k}`);
+                    // We need absolute coordinates relative to the group, but simpler to just grab bounds
+                    const ax = posA.x + k*(config.cellSize+config.gap) + config.cellSize/2;
+                    const ay = posA.y + rowIdx*(config.cellSize+config.gap) + config.cellSize/2;
+                    
+                    // Lines from B
+                    const bx = posB.x + colIdx*(config.cellSize+config.gap) + config.cellSize/2;
+                    const by = posB.y + k*(config.cellSize+config.gap) + config.cellSize/2;
+
+                    // Draw curved paths to result
+                    const pathDataA = d3.path();
+                    pathDataA.moveTo(ax, ay);
+                    pathDataA.bezierCurveTo(ax, ay - 50, tx, ty - 50, tx, ty);
+                    
+                    const pathDataB = d3.path();
+                    pathDataB.moveTo(bx, by);
+                    pathDataB.bezierCurveTo(bx, by - 50, tx, ty - 50, tx, ty);
+
+                    // Simple line is cleaner visually for matrix mult
+                    connectorsGroup.append("line")
+                        .attr("x1", ax).attr("y1", ay)
+                        .attr("x2", tx).attr("y2", ty)
+                        .attr("class", "connector");
+                        
+                    connectorsGroup.append("line")
+                        .attr("x1", bx).attr("y1", by)
+                        .attr("x2", tx).attr("y2", ty)
+                        .attr("class", "connector");
+                }
+
+                const resultVal = state.matrixC[rowIdx][colIdx];
+                formulaHTML += ` = <span style='color:#facc15; font-weight:bold;'>${resultVal}</span>`;
+
+                const bar = d3.select("#formula-bar");
+                bar.html(formulaHTML).style("opacity", 1);
+            }
+
+            function clearHighlight() {
+                d3.selectAll(".active").classed("active", false);
+                connectorsGroup.selectAll("*").remove();
+                d3.select("#formula-bar").style("opacity", 0);
+            }
+        }
+
+        init();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classifier-Free Guidance Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0f172a;
+            font-family: 'Inter', sans-serif;
+            color: #f8fafc;
+        }
+
+        #container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(8px);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 320px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0 0 15px 0;
+            color: #f8fafc;
+            letter-spacing: -0.02em;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-bottom: 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        input[type=range] {
+            width: 100%;
+            -webkit-appearance: none;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #facc15;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        .math-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 15px;
+            border-left: 3px solid #facc15;
+            line-height: 1.6;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 0.8rem;
+            margin-top: 6px;
+            color: #cbd5e1;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        .grid-line {
+            stroke: #1e293b;
+            stroke-width: 1;
+        }
+
+        .vector-line {
+            stroke-width: 3;
+            stroke-linecap: round;
+            transition: all 0.1s ease;
+        }
+
+        .guidance-line {
+            stroke-dasharray: 6, 4;
+            stroke-width: 2;
+            opacity: 0.7;
+        }
+
+        .handle {
+            cursor: grab;
+            stroke: #fff;
+            stroke-width: 2;
+            transition: r 0.2s;
+        }
+        
+        .handle:hover {
+            r: 10;
+        }
+
+        .handle:active {
+            cursor: grabbing;
+        }
+
+        text.label {
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(15,23,42, 0.9);
+        }
+        
+        .tooltip {
+            pointer-events: none;
+            opacity: 0.6;
+            font-size: 10px;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <div id="ui-layer">
+        <h1>Classifier-Free Guidance</h1>
+        
+        <div class="control-group">
+            <label>Guidance Scale (w): <span id="w-val" style="color: #facc15;">3.0</span></label>
+            <input type="range" id="scale-slider" min="0" max="10" step="0.1" value="3">
+        </div>
+
+        <div class="math-display">
+            <div>v<sub>final</sub> = v<sub>uncond</sub> + <span style="color:#facc15">w</span>(v<sub>cond</sub> - v<sub>uncond</sub>)</div>
+        </div>
+
+        <div style="margin-top: 15px;">
+            <div class="legend-item"><div class="dot" style="background:#94a3b8"></div>v<sub>uncond</sub> (Generic/Empty Prompt)</div>
+            <div class="legend-item"><div class="dot" style="background:#22d3ee"></div>v<sub>cond</sub> (Your Prompt)</div>
+            <div class="legend-item"><div class="dot" style="background:#c084fc"></div>v<sub>final</sub> (Result)</div>
+        </div>
+        
+        <p style="font-size: 0.8rem; color: #64748b; margin-top: 15px; font-style: italic;">
+            Drag the Cyan or Gray nodes to change model predictions.
+        </p>
+    </div>
+    <div id="vis"></div>
+</div>
+
+<script>
+    // --- Configuration ---
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const origin = { x: width / 2, y: height / 2 + 100 };
+    
+    // Initial State
+    let state = {
+        w: 3.0,
+        uncond: { x: origin.x - 100, y: origin.y - 150 }, // Generic prediction
+        cond: { x: origin.x + 120, y: origin.y - 180 }   // Prompt prediction
+    };
+
+    const colors = {
+        bg: "#0f172a",
+        uncond: "#94a3b8",
+        cond: "#22d3ee",
+        final: "#c084fc",
+        diff: "#facc15",
+        grid: "#1e293b"
+    };
+
+    // --- D3 Setup ---
+    const svg = d3.select("#vis")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    // Markers for arrowheads
+    const defs = svg.append("defs");
+
+    function createMarker(id, color) {
+        defs.append("marker")
+            .attr("id", id)
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 8)
+            .attr("refY", 0)
+            .attr("markerWidth", 6)
+            .attr("markerHeight", 6)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("fill", color);
+    }
+
+    createMarker("arrow-uncond", colors.uncond);
+    createMarker("arrow-cond", colors.cond);
+    createMarker("arrow-final", colors.final);
+    createMarker("arrow-diff", colors.diff);
+
+    // Grid
+    const gridGroup = svg.append("g").attr("class", "grid");
+    const gridSize = 40;
+    for (let x = 0; x < width; x += gridSize) {
+        gridGroup.append("line").attr("x1", x).attr("y1", 0).attr("x2", x).attr("y2", height).attr("class", "grid-line");
+    }
+    for (let y = 0; y < height; y += gridSize) {
+        gridGroup.append("line").attr("x1", 0).attr("y1", y).attr("x2", width).attr("y2", y).attr("class", "grid-line");
+    }
+
+    // Layer Groups
+    const vectorGroup = svg.append("g");
+    const labelGroup = svg.append("g");
+    const interactionGroup = svg.append("g");
+
+    // --- Elements ---
+
+    // 1. Unconditional Vector (Origin -> Uncond)
+    const lineUncond = vectorGroup.append("line")
+        .attr("stroke", colors.uncond)
+        .attr("class", "vector-line")
+        .attr("marker-end", "url(#arrow-uncond)");
+
+    // 2. Conditional Vector (Origin -> Cond)
+    const lineCond = vectorGroup.append("line")
+        .attr("stroke", colors.cond)
+        .attr("class", "vector-line")
+        .attr("marker-end", "url(#arrow-cond)");
+
+    // 3. Difference Vector (Uncond -> Cond) - Visual aid for the "concept"
+    const lineDiff = vectorGroup.append("line")
+        .attr("stroke", colors.diff)
+        .attr("class", "guidance-line vector-line")
+        .style("opacity", 0.4);
+
+    // 4. Final Vector (Origin -> Final)
+    const lineFinal = vectorGroup.append("line")
+        .attr("stroke", colors.final)
+        .attr("class", "vector-line")
+        .attr("stroke-width", 4)
+        .attr("marker-end", "url(#arrow-final)");
+
+    // 5. Projection Line (Uncond -> Final) to show the extrapolation path
+    const lineProject = vectorGroup.append("line")
+        .attr("stroke", colors.diff)
+        .attr("class", "guidance-line vector-line");
+
+    // Handles
+    const handleUncond = interactionGroup.append("circle")
+        .attr("r", 8).attr("fill", colors.uncond).attr("class", "handle");
+    
+    const handleCond = interactionGroup.append("circle")
+        .attr("r", 8).attr("fill", colors.cond).attr("class", "handle");
+
+    const handleFinal = interactionGroup.append("circle")
+        .attr("r", 6).attr("fill", colors.final).style("pointer-events", "none"); // Not draggable directly
+
+    // Labels
+    const labelUncond = labelGroup.append("text").text("Generic").attr("fill", colors.uncond).attr("class", "label").attr("dy", -15);
+    const labelCond = labelGroup.append("text").text("Prompt").attr("fill", colors.cond).attr("class", "label").attr("dy", -15);
+    const labelFinal = labelGroup.append("text").text("Result").attr("fill", colors.final).attr("class", "label").attr("dy", -15);
+
+    const originDot = interactionGroup.append("circle")
+        .attr("cx", origin.x).attr("cy", origin.y).attr("r", 4).attr("fill", "#fff").attr("opacity", 0.5);
+    
+    labelGroup.append("text")
+        .attr("x", origin.x).attr("y", origin.y + 20)
+        .text("Current State")
+        .attr("fill", "#64748b")
+        .attr("text-anchor", "middle")
+        .attr("class", "tooltip");
+
+    // --- Logic & Update ---
+
+    function update() {
+        // Calculate vectors relative to origin
+        const v_u = { x: state.uncond.x - origin.x, y: state.uncond.y - origin.y };
+        const v_c = { x: state.cond.x - origin.x, y: state.cond.y - origin.y };
+        
+        // CFG Formula: Final = Uncond + w * (Cond - Uncond)
+        // Rewritten as: Final = Uncond + w * Difference
+        
+        const diff = { x: v_c.x - v_u.x, y: v_c.y - v_u.y };
+        
+        const finalVector = {
+            x: v_u.x + state.w * diff.x,
+            y: v_u.y + state.w * diff.y
+        };
+
+        const finalPoint = {
+            x: origin.x + finalVector.x,
+            y: origin.y + finalVector.y
+        };
+
+        // Update DOM
+        
+        // Uncond Line
+        lineUncond
+            .attr("x1", origin.x).attr("y1", origin.y)
+            .attr("x2", state.uncond.x).attr("y2", state.uncond.y);
+
+        // Cond Line
+        lineCond
+            .attr("x1", origin.x).attr("y1", origin.y)
+            .attr("x2", state.cond.x).attr("y2", state.cond.y);
+
+        // Diff Line (Uncond -> Cond)
+        lineDiff
+            .attr("x1", state.uncond.x).attr("y1", state.uncond.y)
+            .attr("x2", state.cond.x).attr("y2", state.cond.y);
+
+        // Projection Line (Uncond -> Final)
+        lineProject
+            .attr("x1", state.uncond.x).attr("y1", state.uncond.y)
+            .attr("x2", finalPoint.x).attr("y2", finalPoint.y);
+
+        // Final Line (Origin -> Final)
+        lineFinal
+            .attr("x1", origin.x).attr("y1", origin.y)
+            .attr("x2", finalPoint.x).attr("y2", finalPoint.y);
+
+        // Handles
+        handleUncond.attr("cx", state.uncond.x).attr("cy", state.uncond.y);
+        handleCond.attr("cx", state.cond.x).attr("cy", state.cond.y);
+        handleFinal.attr("cx", finalPoint.x).attr("cy", finalPoint.y);
+
+        // Labels
+        labelUncond.attr("x", state.uncond.x).attr("y", state.uncond.y);
+        labelCond.attr("x", state.cond.x).attr("y", state.cond.y);
+        labelFinal.attr("x", finalPoint.x).attr("y", finalPoint.y);
+        
+        // Update UI text
+        document.getElementById('w-val').innerText = state.w.toFixed(1);
+    }
+
+    // --- Interactions ---
+
+    // Dragging Logic
+    const drag = d3.drag()
+        .on("drag", function(event, d) {
+            // Clamp to screen slightly
+            d.x = Math.max(50, Math.min(width - 50, event.x));
+            d.y = Math.max(50, Math.min(height - 50, event.y));
+            update();
+        });
+
+    handleUncond.datum(state.uncond).call(drag);
+    handleCond.datum(state.cond).call(drag);
+
+    // Slider Logic
+    d3.select("#scale-slider").on("input", function() {
+        state.w = parseFloat(this.value);
+        update();
+    });
+
+    // Resize handler
+    window.addEventListener('resize', () => {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        svg.attr("width", w).attr("height", h);
+        origin.x = w / 2;
+        origin.y = h / 2 + 100;
+        // Reset positions relative to new origin if needed, or just update origin dot
+        originDot.attr("cx", origin.x).attr("cy", origin.y);
+        update();
+    });
+
+    // Initial Draw
+    update();
+
+</script>
+</body>
+</html>
