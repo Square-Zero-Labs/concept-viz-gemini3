@@ -29,4 +29,4 @@ Concept Viz turns any concept into an interactive visualization. Type a topic an
 - Matrix multiplication: [`examples/matrix-multiplication.html`](examples/matrix-multiplication.html) | live: [`https://square-zero-labs.github.io/concept-viz-gemini3/examples/matrix-multiplication`](https://square-zero-labs.github.io/concept-viz-gemini3/examples/matrix-multiplication)
 - NBA salary cap: [`examples/nba_salary_cap.html`](examples/nba_salary_cap.html) | live: [`https://square-zero-labs.github.io/concept-viz-gemini3/examples/nba_salary_cap`](https://square-zero-labs.github.io/concept-viz-gemini3/examples/nba_salary_cap)
 
-Browse all examples on GitHub Pages: [`/examples/`](https://square-zero-labs.github.io/concept-viz-gemini3/examples/).
+Browse all examples on GitHub Pages: [`Examples`](https://square-zero-labs.github.io/concept-viz-gemini3/examples/index.html).
