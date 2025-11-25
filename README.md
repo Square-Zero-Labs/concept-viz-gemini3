@@ -23,9 +23,10 @@ Concept Viz turns any concept into an interactive visualization. Type a topic an
 4. Open the provided localhost URL and start visualizing concepts.
 
 ## Examples
-- Binary search: [`examples/binary_search.html`](examples/binary_search.html)
-- Classifier-free guidance: [`examples/classifier_free_guidance.html`](examples/classifier_free_guidance.html)
-- Matrix multiplication: [`examples/matrix-multiplication.html`](examples/matrix-multiplication.html)
-- NBA salary cap: [`examples/nba_salary_cap.html`](examples/nba_salary_cap.html)
 
-Open any of these HTML files directly in your browser to see sample outputs created by Concept Viz.
+- Binary search: [`examples/binary_search.html`](examples/binary_search.html) | live: [`https://square-zero-labs.github.io/concept-viz-gemini3/examples/binary_search`](https://square-zero-labs.github.io/concept-viz-gemini3/examples/binary_search)
+- Classifier-free guidance: [`examples/classifier_free_guidance.html`](examples/classifier_free_guidance.html) | live: [`(https://square-zero-labs.github.io/concept-viz-gemini3/examples/classifier_free_guidance`](https://square-zero-labs.github.io/concept-viz-gemini3/examples/classifier_free_guidance)
+- Matrix multiplication: [`examples/matrix-multiplication.html`](examples/matrix-multiplication.html) | live: [`https://square-zero-labs.github.io/concept-viz-gemini3/examples/matrix-multiplication`](https://square-zero-labs.github.io/concept-viz-gemini3/examples/matrix-multiplication)
+- NBA salary cap: [`examples/nba_salary_cap.html`](examples/nba_salary_cap.html) | live: [`https://square-zero-labs.github.io/concept-viz-gemini3/examples/nba_salary_cap`](https://square-zero-labs.github.io/concept-viz-gemini3/examples/nba_salary_cap)
+
+Browse all examples on GitHub Pages: [`/examples/`](https://square-zero-labs.github.io/concept-viz-gemini3/examples/).
