@@ -6,6 +6,10 @@
 
 Concept Viz turns any concept into an interactive visualization. Type a topic and Gemini 3 Pro Preview generates the visualization code and short explainer, rendered in-app with a toggle to inspect the HTML/JS/CSS behind it.
 
+Video walkthrough: [`YouTube`](https://youtu.be/zPXqZodGQ6A)
+
+[![Video thumbnail](https://img.youtube.com/vi/zPXqZodGQ6A/maxresdefault.jpg)](https://youtu.be/zPXqZodGQ6A)
+
 ## What it does
 
 - Generates highly interactive visuals (D3.js or Canvas) from natural language prompts, styled for a dark UI.
