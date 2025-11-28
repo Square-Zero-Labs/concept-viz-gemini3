@@ -32,5 +32,6 @@ Video walkthrough: [`YouTube`](https://youtu.be/zPXqZodGQ6A)
 - Classifier-free guidance: [`examples/classifier_free_guidance.html`](examples/classifier_free_guidance.html) | live: [`(https://square-zero-labs.github.io/concept-viz-gemini3/examples/classifier_free_guidance`](https://square-zero-labs.github.io/concept-viz-gemini3/examples/classifier_free_guidance)
 - Matrix multiplication: [`examples/matrix-multiplication.html`](examples/matrix-multiplication.html) | live: [`https://square-zero-labs.github.io/concept-viz-gemini3/examples/matrix-multiplication`](https://square-zero-labs.github.io/concept-viz-gemini3/examples/matrix-multiplication)
 - NBA salary cap: [`examples/nba_salary_cap.html`](examples/nba_salary_cap.html) | live: [`https://square-zero-labs.github.io/concept-viz-gemini3/examples/nba_salary_cap`](https://square-zero-labs.github.io/concept-viz-gemini3/examples/nba_salary_cap)
+- Stacked discounts: [`examples/stacked_discounts.html`](examples/stacked_discounts.html) | live: [`https://square-zero-labs.github.io/concept-viz-gemini3/examples/stacked_discounts`](https://square-zero-labs.github.io/concept-viz-gemini3/examples/stacked_discounts)
 
 Browse all examples on GitHub Pages: [`Examples`](https://square-zero-labs.github.io/concept-viz-gemini3/examples/index.html).
