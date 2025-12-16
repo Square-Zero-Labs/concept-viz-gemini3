@@ -109,7 +109,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 60px 40px 40px 380px;
+            padding: 40px 40px 40px 120px;
             box-sizing: border-box;
         }
 
@@ -186,7 +186,7 @@
             .range([height - margin.bottom, margin.top]); // 0 at bottom, 1 at top
 
         const barWidth = 140;
-        const xBar = width / 2 - barWidth / 2;
+        const xBar = width / 2 - barWidth / 2 - 80;
         
         // --- Draw Static Elements ---
 
@@ -295,7 +295,7 @@
             .attr("fill-opacity", 0.95)
             .attr("font-size", "20px")
             .attr("font-weight", "700")
-            .attr("text-anchor", "start")
+            .attr("text-anchor", "end")
             .text("Mistaken Additional Discount");
 
         // --- Visualization Logic ---
@@ -381,7 +381,7 @@
                     .attr("y1", naiveCutY)
                     .attr("y2", naiveCutY);
                 naiveG.select("text")
-                    .attr("x", xBar + barWidth + 20)
+                    .attr("x", xBar - 20)
                     .attr("y", naiveCutY - 8);
             } else {
                 naiveG.attr("opacity", 0);
