@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Monty Hall Problem</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            overflow-x: hidden;
+            background-color: #0f172a;
+            color: white;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 16px 28px;
+            gap: 12px;
+            box-sizing: border-box;
+        }
+
+        .page {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .play-area {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #page-title {
+            /* margin: 0; */
+            margin-top: 50;
+            margin-bottom: 0;
+            color: #e0f2fe;
+            font-size: 1.6rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        button {
+            background: #334155;
+            color: white;
+            border: 1px solid #22d3ee;
+            padding: 10px 16px;
+            width: 100%;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+            background: #22d3ee;
+            color: #0f172a;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #instruction-text {
+            font-size: 1.5rem;
+            font-weight: 300;
+            color: #facc15;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 100%;
+            max-width: 720px;
+            margin: 0;
+        }
+
+        /* SVG Container */
+        #vis-container {
+            width: 100%;
+            max-width: 1200px;
+            height: 55vh;
+            min-height: 380px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 0;
+        }
+
+        .actions-row {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            max-width: 400px;
+            margin-top: 8px;
+        }
+
+        .actions-row button {
+            flex: 1;
+        }
+
+        .reset-btn {
+            border-color: #f472b6;
+        }
+
+        .door-group {
+            cursor: pointer;
+            transition: transform 0.2s ease-out;
+            transform: translate(var(--tx), var(--ty));
+            transform-origin: center;
+            transform-box: fill-box;
+        }
+        
+        .door-group:hover {
+            transform: translate(var(--tx), var(--ty)) scale(1.02);
+        }
+
+        .bar-label {
+            font-size: 12px;
+            fill: #94a3b8;
+        }
+
+        .totals {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="page">
+        <h2 id="page-title">Monty Hall Problem</h2>
+        <div class="play-area">
+            <div id="instruction-text">Pick a door to begin</div>
+            <div class="totals">Total Games: <span class="value" id="total-games">0</span></div>
+            <div id="vis-container"></div>
+            <div class="actions-row">
+                <button id="sim-btn">Fast Simulate (100x)</button>
+                <button id="reset-btn" class="reset-btn">Reset Data</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const width = Math.min(window.innerWidth - 32, 1200);
+        const height = Math.min(window.innerHeight * 0.55, 520);
+        const doorWidth = 120;
+        const doorHeight = 200;
+        const gap = 60;
+        const totalWidth = (doorWidth * 3) + (gap * 2);
+        const startX = (width - totalWidth) / 2;
+        const centerY = Math.max(10, height * 0.01);
+
+        // Colors
+        const C_BG = "#0f172a";
+        const C_CYAN = "#22d3ee"; // Door outline
+        const C_YELLOW = "#facc15"; // Stay / Highlight
+        const C_PINK = "#f472b6"; // Goat / Loss
+        const C_PURPLE = "#c084fc"; // Car / Switch Win
+        const C_DOOR_FILL = "#1e293b";
+
+        // State
+        let gameState = "PICK"; // PICK, REVEAL, DECIDE, RESULT
+        let prizeDoor = -1;
+        let selectedDoor = -1;
+        let revealedDoor = -1;
+        let autoMode = false;
+        let stopRequested = false;
+        
+        let stats = {
+            stayWins: 0,
+            stayLosses: 0,
+            switchWins: 0,
+            switchLosses: 0
+        };
+        let simProgress = 0;
+        const SIM_ITERATIONS = 100;
+        const delay = (ms) => new Promise(res => setTimeout(res, ms));
+
+        // D3 Setup
+        const svg = d3.select("#vis-container").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        // Create Doors Data
+        const doorsData = [0, 1, 2];
+
+        // Main Group
+        const mainG = svg.append("g");
+
+        // UI Elements Refs
+        const instructionText = document.getElementById("instruction-text");
+        const elTotalGames = document.getElementById("total-games");
+        const simBtn = document.getElementById("sim-btn");
+
+        // Initialize
+        resetGameRound();
+
+        function resetGameRound() {
+            gameState = "PICK";
+            prizeDoor = Math.floor(Math.random() * 3);
+            selectedDoor = -1;
+            revealedDoor = -1;
+            instructionText.innerText = "Pick a door to begin";
+            instructionText.style.color = C_CYAN;
+            
+            // Clear SVG visual state
+            mainG.selectAll("*").remove();
+            drawScene();
+            updateUI();
+        }
+
+        function drawScene() {
+            // Draw Probability Bars (Background visualization)
+            drawChart();
+
+            // Draw Doors
+            const doors = mainG.selectAll(".door-group")
+                .data(doorsData)
+                .enter()
+                .append("g")
+                .attr("class", "door-group")
+                .style("--tx", (d, i) => `${startX + i * (doorWidth + gap)}px`)
+                .style("--ty", `${centerY}px`)
+                .on("click", handleDoorClick);
+
+            // Door Background (Closed)
+            doors.append("rect")
+                .attr("class", "door-rect")
+                .attr("width", doorWidth)
+                .attr("height", doorHeight)
+                .attr("rx", 8)
+                .attr("fill", C_DOOR_FILL)
+                .attr("stroke", C_CYAN)
+                .attr("stroke-width", 3);
+
+            // Door Label (Number)
+            doors.append("text")
+                .attr("x", doorWidth / 2)
+                .attr("y", doorHeight / 2)
+                .attr("text-anchor", "middle")
+                .attr("dy", ".35em")
+                .attr("fill", C_CYAN)
+                .attr("font-size", "3rem")
+                .attr("font-weight", "bold")
+                .text((d, i) => i + 1);
+
+            // Content behind the door (Initially hidden via opacity or layering, but logically here)
+            // For this viz, we will overlay the content on top when "open"
+        }
+
+        function drawChart() {
+            // Simple visualizer for the stats at the bottom center
+            const barWidth = 100;
+            const chartY = centerY + doorHeight + 70;
+            const chartX = width / 2;
+
+            // Container for charts
+            const chartG = mainG.append("g").attr("class", "chart-area");
+
+            // Stay Bar
+            chartG.append("text")
+                .attr("x", chartX - 100)
+                .attr("y", chartY)
+                .attr("text-anchor", "middle")
+                .attr("fill", C_YELLOW)
+                .attr("font-size", "24px")
+                .text("Stay win %");
+
+            chartG.append("rect")
+                .attr("id", "bar-stay-bg")
+                .attr("x", chartX - 130)
+                .attr("y", chartY + 10)
+                .attr("width", barWidth)
+                .attr("height", 10)
+                .attr("fill", "#334155")
+                .attr("rx", 5);
+            
+            chartG.append("rect")
+                .attr("id", "bar-stay-fill")
+                .attr("x", chartX - 130)
+                .attr("y", chartY + 10)
+                .attr("width", 0)
+                .attr("height", 10)
+                .attr("fill", C_YELLOW)
+                .attr("rx", 5);
+
+            chartG.append("text")
+                .attr("id", "bar-stay-label")
+                .attr("x", chartX - 80)
+                .attr("y", chartY + 42)
+                .attr("text-anchor", "middle")
+                .attr("fill", C_YELLOW)
+                .attr("font-size", "24px")
+                .text("0%");
+
+            // Switch Bar
+            chartG.append("text")
+                .attr("x", chartX + 100)
+                .attr("y", chartY)
+                .attr("text-anchor", "middle")
+                .attr("fill", C_PURPLE)
+                .attr("font-size", "24px")
+                .text("Switch win %");
+
+            chartG.append("rect")
+                .attr("id", "bar-switch-bg")
+                .attr("x", chartX + 30)
+                .attr("y", chartY + 10)
+                .attr("width", barWidth)
+                .attr("height", 10)
+                .attr("fill", "#334155")
+                .attr("rx", 5);
+
+            chartG.append("rect")
+                .attr("id", "bar-switch-fill")
+                .attr("x", chartX + 30)
+                .attr("y", chartY + 10)
+                .attr("width", 0)
+                .attr("height", 10)
+                .attr("fill", C_PURPLE)
+                .attr("rx", 5);
+
+            chartG.append("text")
+                .attr("id", "bar-switch-label")
+                .attr("x", chartX + 80)
+                .attr("y", chartY + 42)
+                .attr("text-anchor", "middle")
+                .attr("fill", C_PURPLE)
+                .attr("font-size", "24px")
+                .text("0%");
+            
+            updateChartVisuals();
+        }
+
+        function getRates() {
+            const totalStay = stats.stayWins + stats.stayLosses;
+            const stayRate = totalStay > 0 ? stats.stayWins / totalStay : 0;
+            
+            const totalSwitch = stats.switchWins + stats.switchLosses;
+            const switchRate = totalSwitch > 0 ? stats.switchWins / totalSwitch : 0;
+
+            return { stayRate, switchRate, totalStay, totalSwitch };
+        }
+
+        function updateChartVisuals(rates = getRates()) {
+            const { stayRate, switchRate } = rates;
+
+            d3.select("#bar-stay-fill")
+                .transition().duration(500)
+                .attr("width", 100 * stayRate);
+
+            d3.select("#bar-switch-fill")
+                .transition().duration(500)
+                .attr("width", 100 * switchRate);
+
+            d3.select("#bar-stay-label").text(`${(stayRate * 100).toFixed(1)}%`);
+            d3.select("#bar-switch-label").text(`${(switchRate * 100).toFixed(1)}%`);
+        }
+
+        function handleDoorClick(event, d) {
+            if (autoMode) return;
+
+            if (gameState === "PICK") {
+                // Player picks a door
+                selectedDoor = d;
+                gameState = "REVEAL";
+                
+                // Highlight Selection
+                highlightDoor(selectedDoor, C_YELLOW);
+                instructionText.innerText = "Host is opening a door...";
+
+                setTimeout(hostRevealsGoat, 600);
+
+            } else if (gameState === "DECIDE") {
+                if (d === revealedDoor) return; // Can't pick the open door
+
+                if (d === selectedDoor) {
+                    // STAY
+                    resolveGame(true);
+                } else {
+                    // SWITCH
+                    selectedDoor = d; // Update selection for visual clarity
+                    resolveGame(false);
+                }
+            }
+        }
+
+        function highlightDoor(index, color) {
+            d3.selectAll(".door-group")
+                .filter((d, i) => i === index)
+                .select("rect")
+                .transition().duration(200)
+                .attr("stroke", color)
+                .attr("stroke-width", 6)
+                .attr("fill", d3.color(color).darker(3));
+        }
+
+        function hostRevealsGoat() {
+            // Host picks a door that is NOT the prize and NOT the selected door
+            const available = [0, 1, 2].filter(d => d !== prizeDoor && d !== selectedDoor);
+            revealedDoor = available[Math.floor(Math.random() * available.length)];
+            
+            openDoor(revealedDoor, "GOAT");
+            
+            gameState = "DECIDE";
+            instructionText.innerHTML = `Door ${revealedDoor + 1} is a Goat!<br><span style='font-size:1rem; color:white'>Click your door to STAY, or the other to SWITCH.</span>`;
+        }
+
+        function openDoor(index, type) {
+            const group = d3.selectAll(".door-group").filter((d, i) => i === index);
+            
+            // Animate door opening (fade out rect, show content)
+            group.select("rect")
+                .transition().duration(500)
+                .attr("fill-opacity", 0.1)
+                .attr("stroke-opacity", 0.2);
+            
+            group.select("text").remove();
+
+            // Append content
+            const cx = doorWidth / 2;
+            const cy = doorHeight / 2;
+
+            if (type === "GOAT") {
+                group.append("text")
+                    .attr("x", cx).attr("y", cy)
+                    .attr("text-anchor", "middle")
+                    .attr("dy", ".35em")
+                    .attr("font-size", "56px")
+                    .text("🐐")
+                    .attr("opacity", 0)
+                    .transition().duration(500).attr("opacity", 1);
+                
+                group.append("text")
+                    .attr("x", cx).attr("y", cy + 40)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", C_PINK)
+                    .attr("font-size", "16px")
+                    .text("GOAT");
+            } else {
+                // CAR
+                group.append("text")
+                    .attr("x", cx).attr("y", cy)
+                    .attr("text-anchor", "middle")
+                    .attr("dy", ".35em")
+                    .attr("font-size", "56px")
+                    .text("🏎️")
+                    .attr("opacity", 0)
+                    .transition().duration(500).attr("opacity", 1);
+                
+                group.append("text")
+                    .attr("x", cx).attr("y", cy + 40)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", C_PURPLE)
+                    .attr("font-size", "16px")
+                    .text("CAR");
+            }
+        }
+
+        function resolveGame(didStay) {
+            gameState = "RESULT";
+            const won = (selectedDoor === prizeDoor);
+
+            // Open all doors
+            [0, 1, 2].forEach(d => {
+                if (d !== revealedDoor) {
+                    openDoor(d, d === prizeDoor ? "CAR" : "GOAT");
+                }
+            });
+
+            // Update Stats
+            if (didStay) {
+                if (won) stats.stayWins++;
+                else stats.stayLosses++;
+            } else {
+                if (won) stats.switchWins++;
+                else stats.switchLosses++;
+            }
+            updateUI();
+
+            // Feedback
+            if (won) {
+                instructionText.innerHTML = `<span style='color:${C_PURPLE}'>You win 🎉</span>`;
+                highlightDoor(selectedDoor, C_PURPLE);
+            } else {
+                instructionText.innerHTML = `<span style='color:${C_PINK}'>You lose 😢</span>`;
+                highlightDoor(selectedDoor, C_PINK);
+            }
+
+            if (!autoMode) {
+                setTimeout(resetGameRound, 2500);
+            }
+        }
+
+        function updateUI() {
+            const { stayRate, switchRate, totalStay, totalSwitch } = getRates();
+
+            elTotalGames.innerText = totalStay + totalSwitch;
+
+            updateChartVisuals({ stayRate, switchRate });
+        }
+
+        // --- Simulation Logic ---
+
+        document.getElementById("sim-btn").addEventListener("click", async () => {
+            const iterations = SIM_ITERATIONS;
+            if (autoMode) {
+                stopRequested = true;
+                simBtn.innerText = "Stopping...";
+                return;
+            }
+            await runAutoGames(iterations);
+        });
+
+        document.getElementById("reset-btn").addEventListener("click", () => {
+            stats = { stayWins: 0, stayLosses: 0, switchWins: 0, switchLosses: 0 };
+            simProgress = 0;
+            updateUI();
+            resetGameRound();
+        });
+
+        function runSimulation(n) {
+            // We will simulate n games rapidly
+            // We will alternate strategies or randomize them to show the trend
+            
+            let tempStats = { ...stats };
+
+            for(let i=0; i<n; i++) {
+                const simPrize = Math.floor(Math.random() * 3);
+                const simPick = Math.floor(Math.random() * 3);
+                
+                // Host opens a goat
+                // Logic: If pick == prize, host opens either of other 2. If pick != prize, host opens the one remaining goat.
+                
+                // Strategy: Randomly decide to Stay or Switch for this simulation instance
+                const strategySwitch = Math.random() > 0.5;
+
+                if (strategySwitch) {
+                    // If you switch, you win if you originally picked a GOAT (2/3 chance)
+                    if (simPick !== simPrize) tempStats.switchWins++;
+                    else tempStats.switchLosses++;
+                } else {
+                    // If you stay, you win if you originally picked the CAR (1/3 chance)
+                    if (simPick === simPrize) tempStats.stayWins++;
+                    else tempStats.stayLosses++;
+                }
+            }
+
+            // Animate the numbers up
+            stats = tempStats;
+            updateUI();
+        }
+
+        async function playAutoRound() {
+            if (stopRequested) return false;
+            resetGameRound();
+            await delay(120);
+            if (stopRequested) return false;
+
+            // Pick a door
+            selectedDoor = Math.floor(Math.random() * 3);
+            gameState = "REVEAL";
+            highlightDoor(selectedDoor, C_YELLOW);
+            instructionText.innerText = "Host is opening a door...";
+
+            await delay(200);
+            if (stopRequested) return false;
+
+            // Host reveals a goat
+            const available = [0, 1, 2].filter(d => d !== prizeDoor && d !== selectedDoor);
+            revealedDoor = available[Math.floor(Math.random() * available.length)];
+            openDoor(revealedDoor, "GOAT");
+
+            gameState = "DECIDE";
+            const strategySwitch = Math.random() > 0.5;
+            instructionText.innerText = strategySwitch ? "Auto: Switching..." : "Auto: Staying...";
+
+            await delay(250);
+            if (stopRequested) return false;
+
+            if (strategySwitch) {
+                // Switch to the other unopened door
+                selectedDoor = [0, 1, 2].find(d => d !== revealedDoor && d !== selectedDoor);
+                resolveGame(false);
+            } else {
+                resolveGame(true);
+            }
+
+            await delay(600);
+            return !stopRequested;
+        }
+
+        async function runAutoGames(iterations = SIM_ITERATIONS) {
+            if (autoMode) return;
+            autoMode = true;
+            stopRequested = false;
+            simBtn.disabled = false;
+            simBtn.innerText = `Stop (${simProgress}/${iterations})`;
+
+            let didStopEarly = false;
+            for (let i = simProgress; i < iterations; i++) {
+                if (stopRequested) break;
+                const currentRound = i + 1;
+                simBtn.innerText = `Stop (${currentRound}/${iterations})`;
+                instructionText.innerText = `Fast sim ${currentRound} of ${iterations}`;
+                const finished = await playAutoRound();
+                if (!finished || stopRequested) break;
+                simProgress = currentRound;
+            }
+            didStopEarly = stopRequested;
+
+            autoMode = false;
+            simBtn.disabled = false;
+            simBtn.innerText = "Fast Simulate (100x)";
+            stopRequested = false;
+            resetGameRound();
+            if (!didStopEarly && simProgress >= iterations) {
+                instructionText.innerText = "Fast sim complete";
+                simProgress = 0;
+            } else {
+                instructionText.innerText = didStopEarly ? "Fast sim stopped" : "Pick a door to begin";
+            }
+            instructionText.style.color = C_CYAN;
+        }
+
+        // Handle Resize
+        window.addEventListener('resize', () => {
+            // Simple reload for resizing in this context to keep code clean
+            location.reload();
+        });
+
+    </script>
+</body>
+</html>
